@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – MD KKU</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f4f8; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    header {
+      background: #1e40af; color: #fff;
+      padding: .75rem 1.25rem; display: flex; align-items: center; gap: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2); flex-shrink: 0;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; }
+    header .sub { font-size: .78rem; opacity: .75; margin-top: .1rem; }
+    .header-right { margin-left: auto; display: flex; gap: .6rem; align-items: center; }
+    .btn { padding: .38rem .8rem; border-radius: 6px; border: none; font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-ghost { background: rgba(255,255,255,.15); color: #fff; }
+
+    /* ── Layout ── */
+    .page { flex: 1; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 1400px; width: 100%; margin: 0 auto; }
+
+    /* ── Stat cards ── */
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; }
+    .stat-card {
+      background: #fff; border-radius: 10px; padding: 1rem 1.1rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,.06); border-left: 4px solid;
+    }
+    .stat-card .label { font-size: .72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
+    .stat-card .value { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+    .stat-card .pct   { font-size: .78rem; color: #64748b; margin-top: .2rem; }
+    .card-all     { border-color: #1e40af; } .card-all .value     { color: #1e40af; }
+    .card-isan    { border-color: #16a34a; } .card-isan .value    { color: #16a34a; }
+    .card-noisan  { border-color: #d97706; } .card-noisan .value  { color: #d97706; }
+    .card-bkk     { border-color: #be185d; } .card-bkk .value    { color: #be185d; }
+    .card-kk      { border-color: #2563eb; } .card-kk .value     { color: #2563eb; }
+    .card-nokk    { border-color: #7c3aed; } .card-nokk .value   { color: #7c3aed; }
+
+    /* ── Chart grid ── */
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 8px rgba(0,0,0,.07);
+      padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: .75rem;
+    }
+    .chart-card.full-width { grid-column: 1 / -1; }
+    .chart-title { font-size: .92rem; font-weight: 700; color: #1e293b; }
+    .chart-sub   { font-size: .75rem; color: #94a3b8; }
+    .chart-wrap  { position: relative; }
+
+    /* ── Table inside card ── */
+    .rank-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .rank-table th { text-align: left; font-size: .7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; padding: .3rem .5rem; border-bottom: 1px solid #f1f5f9; }
+    .rank-table td { padding: .35rem .5rem; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    .rank-table tr:last-child td { border-bottom: none; }
+    .rank-table tr:hover td { background: #f8fafc; }
+    .rank-num  { font-weight: 700; color: #94a3b8; width: 28px; }
+    .bar-cell  { width: 120px; }
+    .bar-bg    { background: #f1f5f9; border-radius: 4px; height: 6px; overflow: hidden; }
+    .bar-fill  { height: 6px; border-radius: 4px; transition: width .4s; }
+    .pct-cell  { width: 46px; text-align: right; color: #64748b; font-weight: 600; }
+    .cnt-cell  { width: 38px; text-align: right; font-weight: 700; color: #1e293b; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>MD KKU – Dashboard</h1>
+    <div class="sub">สถิตินักศึกษาแพทย์ มข. รุ่น 54 จำแนกตามจังหวัดและโรงเรียน</div>
+  </div>
+  <div class="header-right">
+    <a href="/" class="btn btn-ghost">← ตารางข้อมูล</a>
+    <a href="/logout" class="btn btn-ghost">ออกจากระบบ</a>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ── Stat Cards ── -->
+  <div class="stat-row" id="stat-row">
+    <div class="stat-card card-all">  <div class="label">ทั้งหมด</div>       <div class="value" id="s-total">…</div> <div class="pct">100%</div> </div>
+    <div class="stat-card card-isan"> <div class="label">อีสาน</div>         <div class="value" id="s-isan">…</div>  <div class="pct" id="p-isan">…</div>  </div>
+    <div class="stat-card card-noisan"><div class="label">นอกอีสาน</div>     <div class="value" id="s-noisan">…</div><div class="pct" id="p-noisan">…</div></div>
+    <div class="stat-card card-bkk">  <div class="label">กรุงเทพ+ปริมณฑล</div><div class="value" id="s-bkk">…</div><div class="pct" id="p-bkk">…</div>  </div>
+    <div class="stat-card card-kk">   <div class="label">ขอนแก่น</div>       <div class="value" id="s-kk">…</div>   <div class="pct" id="p-kk">…</div>    </div>
+    <div class="stat-card card-nokk"> <div class="label">อีสาน ≠ ขก</div>   <div class="value" id="s-nokk">…</div> <div class="pct" id="p-nokk">…</div>  </div>
+  </div>
+
+  <!-- ── Charts row 1 ── -->
+  <div class="chart-grid">
+
+    <!-- Donut: region flags -->
+    <div class="chart-card">
+      <div>
+        <div class="chart-title">สัดส่วนตามภูมิภาค (Flags)</div>
+        <div class="chart-sub">จากจังหวัดโรงเรียนหลัก (โรงเรียน 1)</div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-donut" height="240"></canvas></div>
+    </div>
+
+    <!-- Bar: region from province mapping -->
+    <div class="chart-card">
+      <div>
+        <div class="chart-title">สัดส่วนตามภาค</div>
+        <div class="chart-sub">รวมทุก slot โรงเรียน</div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-region" height="240"></canvas></div>
+    </div>
+
+  </div>
+
+  <!-- ── Charts row 2 ── -->
+  <div class="chart-grid">
+
+    <!-- Province table -->
+    <div class="chart-card">
+      <div>
+        <div class="chart-title">Top จังหวัด (โรงเรียน 1)</div>
+        <div class="chart-sub">นับจาก province_1 เท่านั้น</div>
+      </div>
+      <div style="overflow-y:auto; max-height: 420px;">
+        <table class="rank-table">
+          <thead><tr><th>#</th><th>จังหวัด</th><th>นักศึกษา</th><th class="bar-cell"></th><th class="pct-cell">%</th></tr></thead>
+          <tbody id="tbl-province1"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Province all slots table -->
+    <div class="chart-card">
+      <div>
+        <div class="chart-title">Top จังหวัด (ทุก slot)</div>
+        <div class="chart-sub">รวม province_1–5</div>
+      </div>
+      <div style="overflow-y:auto; max-height: 420px;">
+        <table class="rank-table">
+          <thead><tr><th>#</th><th>จังหวัด</th><th>นักศึกษา</th><th class="bar-cell"></th><th class="pct-cell">%</th></tr></thead>
+          <tbody id="tbl-province-all"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── School table full width ── -->
+  <div class="chart-card full-width">
+    <div>
+      <div class="chart-title">Top โรงเรียน (ทุก slot)</div>
+      <div class="chart-sub">รวม school_1–5 • คลิกหัวข้อเพื่อเรียงลำดับ</div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="rank-table">
+        <thead><tr><th>#</th><th>โรงเรียน</th><th>นักศึกษา</th><th class="bar-cell" style="min-width:160px"></th><th class="pct-cell">%</th></tr></thead>
+        <tbody id="tbl-school"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+const PALETTE = [
+  "#1e40af","#16a34a","#d97706","#be185d","#2563eb","#7c3aed",
+  "#0891b2","#dc2626","#65a30d","#9333ea","#0d9488","#ea580c",
+  "#1d4ed8","#15803d","#b45309","#9f1239","#1e3a8a","#581c87",
+];
+
+function pct(val, total) {
+  return total ? ((val / total) * 100).toFixed(1) + "%" : "0%";
+}
+
+function buildTable(tbodyId, rows, total, barColor) {
+  const tbody = document.getElementById(tbodyId);
+  tbody.innerHTML = "";
+  const max = rows[0]?.count || 1;
+  rows.forEach((r, i) => {
+    const label = r.province || r.school;
+    const barW = Math.round((r.count / max) * 100);
+    const p = pct(r.count, total);
+    tbody.innerHTML += `
+      <tr>
+        <td class="rank-num">${i + 1}</td>
+        <td>${label}</td>
+        <td class="cnt-cell">${r.count}</td>
+        <td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${barColor}"></div></div></td>
+        <td class="pct-cell">${p}</td>
+      </tr>`;
+  });
+}
+
+fetch("/api/dashboard")
+  .then(r => r.json())
+  .then(d => {
+    const total = d.total;
+    const fs = d.flag_stats;
+
+    // ── Stat cards ──
+    document.getElementById("s-total").textContent = total;
+    document.getElementById("s-isan").textContent  = fs["อีสาน"];
+    document.getElementById("s-noisan").textContent= fs["นอกอีสาน"];
+    document.getElementById("s-bkk").textContent   = d.province1_stats.filter(p => ["กรุงเทพมหานคร","นนทบุรี","ปทุมธานี","สมุทรปราการ","นครปฐม","สมุทรสาคร"].includes(p.province)).reduce((a,b)=>a+b.count,0);
+    document.getElementById("s-kk").textContent    = fs["ขอนแก่น"];
+    document.getElementById("s-nokk").textContent  = fs["อีสาน (ไม่ใช่ ขก)"];
+
+    function setPct(id, val) { document.getElementById(id).textContent = pct(val, total); }
+    setPct("p-isan",   fs["อีสาน"]);
+    setPct("p-noisan", fs["นอกอีสาน"]);
+    document.getElementById("p-bkk").textContent = pct(parseInt(document.getElementById("s-bkk").textContent), total);
+    setPct("p-kk",   fs["ขอนแก่น"]);
+    setPct("p-nokk", fs["อีสาน (ไม่ใช่ ขก)"]);
+
+    // ── Donut chart ──
+    new Chart(document.getElementById("chart-donut"), {
+      type: "doughnut",
+      data: {
+        labels: ["อีสาน", "ขอนแก่น", "อีสาน≠ขก", "นอกอีสาน"],
+        datasets: [{
+          data: [fs["อีสาน"], fs["ขอนแก่น"], fs["อีสาน (ไม่ใช่ ขก)"], fs["นอกอีสาน"]],
+          backgroundColor: ["#16a34a","#2563eb","#7c3aed","#d97706"],
+          borderWidth: 2, borderColor: "#fff",
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: "bottom", labels: { font: { size: 12 }, padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.label}: ${ctx.raw} คน (${pct(ctx.raw, total)})`
+            }
+          }
+        },
+        cutout: "62%",
+      }
+    });
+
+    // ── Region bar chart ──
+    const regions = d.region_stats;
+    new Chart(document.getElementById("chart-region"), {
+      type: "bar",
+      data: {
+        labels: regions.map(r => r.region),
+        datasets: [{
+          label: "จำนวนนักศึกษา",
+          data: regions.map(r => r.count),
+          backgroundColor: PALETTE,
+          borderRadius: 5,
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.raw} คน (${pct(ctx.raw, d.province_stats.reduce((a,b)=>a+b.count,0))})`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { color: "#f1f5f9" }, ticks: { font: { size: 11 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 12 } } },
+        }
+      }
+    });
+
+    // ── Tables ──
+    buildTable("tbl-province1",    d.province1_stats, total, "#1e40af");
+    buildTable("tbl-province-all", d.province_stats,  d.province_stats.reduce((a,b)=>a+b.count,0), "#0891b2");
+    buildTable("tbl-school",       d.school_stats,    d.school_stats.reduce((a,b)=>a+b.count,0), "#7c3aed");
+  });
+</script>
+</body>
+</html>
