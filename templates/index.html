@@ -37,6 +37,27 @@
     .btn-ghost { background: rgba(255,255,255,.15); color: #fff; }
     .btn-save  { background: #fff; color: var(--primary); }
 
+    /* ── Filter bar ── */
+    .filter-bar {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: .5rem 1.25rem; display: flex; align-items: center; gap: .4rem;
+      flex-wrap: wrap; flex-shrink: 0;
+    }
+    .chip {
+      padding: .28rem .75rem; border-radius: 999px;
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+      border: 2px solid transparent; transition: all .15s; user-select: none;
+      white-space: nowrap;
+    }
+    .chip.all         { background: #e0e7ff; color: var(--primary); }
+    .chip.isan        { background: #dcfce7; color: #15803d; }
+    .chip.non-isan    { background: #fef3c7; color: #b45309; }
+    .chip.bkk         { background: #fce7f3; color: #be185d; }
+    .chip.kk          { background: #dbeafe; color: #1d4ed8; }
+    .chip.non-kk-isan { background: #ede9fe; color: #6d28d9; }
+    .chip.active      { border-color: currentColor; }
+    .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 .15rem; }
+
     /* ── Toolbar ── */
     .toolbar {
       background: var(--card); border-bottom: 1px solid var(--border);
@@ -206,6 +227,18 @@
   </div>
 </header>
 
+<!-- ── Filter bar ───────────────────────────────── -->
+<div class="filter-bar">
+  <span class="chip all active" data-filter="all">ทั้งหมด <b id="cnt-all">…</b></span>
+  <div class="filter-sep"></div>
+  <span class="chip isan" data-filter="isan">อีสาน <b id="cnt-isan">…</b></span>
+  <span class="chip non-isan" data-filter="non_isan">นอกอีสาน <b id="cnt-non-isan">…</b></span>
+  <span class="chip bkk" data-filter="bkk">กรุงเทพ+ปริมณฑล <b id="cnt-bkk">…</b></span>
+  <div class="filter-sep"></div>
+  <span class="chip kk" data-filter="kk">ขอนแก่น <b id="cnt-kk">…</b></span>
+  <span class="chip non-kk-isan" data-filter="non_kk_isan">อีสานไม่ใช่ขอนแก่น <b id="cnt-non-kk-isan">…</b></span>
+</div>
+
 <!-- ── Toolbar ─────────────────────────────────── -->
 <div class="toolbar">
   <div class="search-wrap">
@@ -268,6 +301,7 @@
 <script src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────
+let currentFilter = "all";
 let currentSearch = "";
 let table;
 let saveTimer = null;
@@ -368,7 +402,7 @@ function notesBtnClick(e, cell) {
 // ── Table ────────────────────────────────────────────────────────────
 table = new Tabulator("#student-table", {
   layout: "fitDataFill",
-  height: "calc(100vh - 148px)",
+  height: "calc(100vh - 186px)",
   pagination: "local",
   paginationSize: 50,
   paginationSizeSelector: [25, 50, 100, 250],
@@ -407,12 +441,34 @@ table = new Tabulator("#student-table", {
 
 // ── Load data ────────────────────────────────────────────────────────
 function loadData() {
-  const p = new URLSearchParams();
+  const p = new URLSearchParams({ filter: currentFilter });
   if (currentSearch) p.set("search", currentSearch);
   fetch("/api/students?" + p)
     .then(r => r.json())
     .then(data => table.setData(data));
 }
+
+// ── Stats ──────────────────────────────────────────────────────────
+function loadStats() {
+  fetch("/api/stats").then(r => r.json()).then(s => {
+    document.getElementById("cnt-all").textContent         = s.total;
+    document.getElementById("cnt-isan").textContent        = s.isan;
+    document.getElementById("cnt-non-isan").textContent    = s.non_isan;
+    document.getElementById("cnt-bkk").textContent         = s.bkk;
+    document.getElementById("cnt-kk").textContent          = s.kk;
+    document.getElementById("cnt-non-kk-isan").textContent = s.non_kk_isan;
+  });
+}
+
+// ── Filter chips ─────────────────────────────────────────────────────
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    currentFilter = chip.dataset.filter;
+    loadData();
+  });
+});
 
 // ── Search ───────────────────────────────────────────────────────────
 let searchTimer2;
@@ -529,6 +585,7 @@ function showToast(msg) {
 
 // ── Init ──────────────────────────────────────────────────────────────
 loadData();
+loadStats();
 </script>
 </body>
 </html>

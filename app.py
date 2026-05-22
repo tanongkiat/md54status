@@ -38,7 +38,7 @@ EDITABLE_COLUMNS = [
     "school_4", "province_4",
     "school_5", "province_5",
     "school_background", "achievements",
-    "is_isan", "is_kk", "is_non_isan", "is_non_kk_isan",
+    "is_isan", "is_kk", "is_non_isan", "is_non_kk_isan", "is_bkk",
 ]
 
 
@@ -85,9 +85,20 @@ def index():
 @login_required
 def list_students():
     search = request.args.get("search", "").strip()
+    filter_tag = request.args.get("filter", "all")
 
     query = "SELECT * FROM students WHERE 1=1"
     params = []
+
+    filter_map = {
+        "isan":        "is_isan",
+        "non_isan":    "is_non_isan",
+        "kk":          "is_kk",
+        "non_kk_isan": "is_non_kk_isan",
+        "bkk":         "is_bkk",
+    }
+    if filter_tag in filter_map:
+        query += f" AND {filter_map[filter_tag]}=1"
 
     if search:
         query += """ AND (
@@ -164,16 +175,29 @@ def toggle_flag(row_id, flag):
 @login_required
 def stats():
     conn = get_db()
+    def cnt(col):
+        return conn.execute(f"SELECT COUNT(*) FROM students WHERE {col}=1").fetchone()[0]
     total = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-    isan = conn.execute("SELECT COUNT(*) FROM students WHERE is_isan=1").fetchone()[0]
-    kk = conn.execute("SELECT COUNT(*) FROM students WHERE is_kk=1").fetchone()[0]
-    non_isan = conn.execute("SELECT COUNT(*) FROM students WHERE is_non_isan=1").fetchone()[0]
-    non_kk_isan = conn.execute("SELECT COUNT(*) FROM students WHERE is_non_kk_isan=1").fetchone()[0]
+    result = {
+        "total":        total,
+        "isan":         cnt("is_isan"),
+        "non_isan":     cnt("is_non_isan"),
+        "kk":           cnt("is_kk"),
+        "non_kk_isan":  cnt("is_non_kk_isan"),
+        "bkk":          cnt("is_bkk"),
+    }
     conn.close()
-    return jsonify({
-        "total": total, "isan": isan, "kk": kk,
-        "non_isan": non_isan, "non_kk_isan": non_kk_isan,
-    })
+    return jsonify(result)
+
+
+@app.route("/admin/recompute-flags", methods=["POST"])
+@login_required
+def recompute_flags_route():
+    from recompute_flags import recompute
+    conn = get_db()
+    recompute(conn)
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/admin/download-db")
