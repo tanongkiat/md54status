@@ -359,12 +359,40 @@ def api_dashboard():
         region_counts[region] = region_counts.get(region, 0) + p["count"]
     region_stats = [{"region": k, "count": v} for k, v in region_counts.items() if v > 0]
 
+    # ── Gender stats (derived from name prefix) ──────────────────────────
+    male_total = conn.execute("SELECT COUNT(*) FROM students WHERE full_name LIKE 'นาย%'").fetchone()[0]
+    female_total = total - male_total
+
+    gender_province_rows = conn.execute("""
+        SELECT province_1,
+            SUM(CASE WHEN full_name LIKE 'นาย%' THEN 1 ELSE 0 END) as male,
+            SUM(CASE WHEN full_name NOT LIKE 'นาย%' THEN 1 ELSE 0 END) as female,
+            COUNT(*) as cnt
+        FROM students
+        WHERE province_1 != '' AND province_1 IS NOT NULL
+        GROUP BY province_1 ORDER BY cnt DESC LIMIT 30
+    """).fetchall()
+    gender_province_stats = [{"province": r[0], "male": r[1], "female": r[2], "total": r[3]} for r in gender_province_rows]
+
+    region_gender = {r: {"male": 0, "female": 0} for r in REGION_ORDER}
+    for p in gender_province_stats:
+        region = PROVINCE_REGION.get(p["province"], "ต่างประเทศ/อื่นๆ")
+        region_gender[region]["male"]   += p["male"]
+        region_gender[region]["female"] += p["female"]
+    gender_region_stats = [
+        {"region": k, "male": v["male"], "female": v["female"], "total": v["male"] + v["female"]}
+        for k, v in region_gender.items() if v["male"] + v["female"] > 0
+    ]
+
     conn.close()
     return jsonify({
         "flag_stats": flag_stats,
         "province1_stats": province1_stats,
         "school_stats": school_stats,
         "region_stats": region_stats,
+        "gender_total": {"male": male_total, "female": female_total},
+        "gender_province_stats": gender_province_stats,
+        "gender_region_stats": gender_region_stats,
         "total": total,
     })
 
