@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MD KKU – Student Editor</title>
+  <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6.2.5/dist/css/tabulator_bootstrap5.min.css" />
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --card: #fff;
+      --primary: #1e40af;
+      --primary-h: #1d4ed8;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --saving: #f59e0b;
+      --saved: #16a34a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary); color: #fff;
+      padding: .75rem 1.25rem; display: flex; align-items: center; gap: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2); flex-shrink: 0;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; }
+    header .sub { font-size: .78rem; opacity: .75; margin-top: .1rem; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: .6rem; }
+    .btn {
+      padding: .38rem .8rem; border-radius: 6px; border: none;
+      font-size: .82rem; font-weight: 600; cursor: pointer; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-ghost { background: rgba(255,255,255,.15); color: #fff; }
+    .btn-save  { background: #fff; color: var(--primary); }
+
+    /* ── Filter / Stats bar ── */
+    .filter-bar {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: .5rem 1.25rem; display: flex; align-items: center; gap: .5rem;
+      flex-wrap: wrap; flex-shrink: 0;
+    }
+    .chip {
+      padding: .28rem .7rem; border-radius: 999px;
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+      border: 2px solid transparent; transition: all .15s; user-select: none;
+    }
+    .chip.all        { background: #e0e7ff; color: var(--primary); }
+    .chip.isan       { background: #dcfce7; color: #15803d; }
+    .chip.kk         { background: #dbeafe; color: #1d4ed8; }
+    .chip.non_isan   { background: #fef3c7; color: #b45309; }
+    .chip.non_kk_isan{ background: #ede9fe; color: #6d28d9; }
+    .chip.active     { border-color: currentColor; }
+
+    .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 .25rem; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: .45rem 1.25rem; display: flex; align-items: center; gap: .6rem;
+      flex-shrink: 0;
+    }
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      padding: .38rem .75rem .38rem 2rem; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .88rem; width: 240px; outline: none;
+    }
+    .search-wrap input:focus { border-color: var(--primary); }
+    .search-wrap .search-icon {
+      position: absolute; left: .55rem; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: .9rem; pointer-events: none;
+    }
+    .spacer { flex: 1; }
+    .save-status {
+      font-size: .8rem; font-weight: 600; padding: .3rem .6rem;
+      border-radius: 6px; display: none;
+    }
+    .save-status.saving { display: block; background: #fef3c7; color: #b45309; }
+    .save-status.saved  { display: block; background: #dcfce7; color: #15803d; }
+    .save-status.error  { display: block; background: #fee2e2; color: #b91c1c; }
+    .tb-btn {
+      padding: .38rem .75rem; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--card); color: var(--muted); font-size: .82rem;
+      font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    .tb-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* ── Table wrap ── */
+    #table-wrap { padding: .75rem 1.25rem 0; flex: 1; min-height: 0; }
+
+    /* ── Tabulator overrides ── */
+    .tabulator {
+      border: 1px solid var(--border) !important;
+      border-radius: 10px !important;
+      overflow: hidden;
+      font-size: .83rem;
+    }
+    .tabulator .tabulator-header {
+      background: #f8fafc !important;
+      border-bottom: 2px solid var(--border) !important;
+    }
+    .tabulator .tabulator-col-title {
+      font-size: .72rem; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+    }
+    .tabulator .tabulator-row { border-bottom: 1px solid #f1f5f9; }
+    .tabulator .tabulator-row:nth-child(even) { background: #fafbfd; }
+    .tabulator .tabulator-row:hover { background: #eff6ff !important; }
+    .tabulator .tabulator-row.tabulator-row-selected { background: #dbeafe !important; }
+    .tabulator .tabulator-cell { padding: .42rem .55rem !important; }
+
+    /* editing cell */
+    .tabulator .tabulator-cell.tabulator-editing { background: #fef9c3 !important; outline: 2px solid #f59e0b !important; }
+    .tabulator .tabulator-cell.tabulator-editing input {
+      background: transparent; border: none; outline: none;
+      font-size: .83rem; width: 100%; padding: 0;
+    }
+
+    /* dirty (unsaved) row highlight */
+    .tabulator .tabulator-row.row-dirty { background: #fffbeb !important; }
+
+    /* flag checkbox cell */
+    .flag-cell {
+      display: flex; justify-content: center; align-items: center;
+      cursor: pointer; height: 100%;
+    }
+    .flag-cell .tick {
+      width: 18px; height: 18px; border-radius: 4px; border: 2px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; transition: all .12s;
+    }
+    .flag-cell.on-isan      .tick { background: #dcfce7; border-color: #16a34a; color: #15803d; }
+    .flag-cell.on-kk        .tick { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; }
+    .flag-cell.on-non_isan  .tick { background: #fef3c7; border-color: #d97706; color: #b45309; }
+    .flag-cell.on-non_kk_isan .tick { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+
+    /* notes button */
+    .notes-btn {
+      background: none; border: 1px solid var(--border); border-radius: 5px;
+      padding: .15rem .4rem; cursor: pointer; font-size: .75rem; color: var(--muted);
+      transition: all .12s;
+    }
+    .notes-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .notes-btn.has-notes { border-color: #a78bfa; color: #7c3aed; background: #faf5ff; }
+
+    /* row save dot */
+    .row-dot {
+      width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+      background: transparent; margin-right: 3px;
+    }
+    .row-dot.saving { background: #f59e0b; }
+    .row-dot.saved  { background: #16a34a; }
+    .row-dot.error  { background: #dc2626; }
+
+    /* ── Drawer ── */
+    #drawer {
+      position: fixed; top: 0; right: -520px; width: 500px; height: 100vh;
+      background: var(--card); box-shadow: -4px 0 28px rgba(0,0,0,.12);
+      transition: right .22s cubic-bezier(.4,0,.2,1);
+      overflow-y: auto; z-index: 900; display: flex; flex-direction: column;
+    }
+    #drawer.open { right: 0; }
+    .drawer-head {
+      background: var(--primary); color: #fff;
+      padding: .9rem 1.1rem; display: flex; align-items: center; gap: .6rem;
+      position: sticky; top: 0; z-index: 1; flex-shrink: 0;
+    }
+    .drawer-head h2 { font-size: .95rem; flex: 1; }
+    .drawer-close { background: none; border: none; color: #fff; font-size: 1.3rem; cursor: pointer; line-height: 1; padding: .1rem .3rem; border-radius: 4px; }
+    .drawer-close:hover { background: rgba(255,255,255,.2); }
+    .drawer-body { padding: 1.1rem; flex: 1; }
+    .dfield { margin-bottom: .9rem; }
+    .dfield label { display: block; font-size: .71rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
+    .dfield input, .dfield textarea {
+      width: 100%; padding: .45rem .65rem; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .875rem; font-family: inherit; outline: none; resize: vertical;
+    }
+    .dfield input:focus, .dfield textarea:focus { border-color: var(--primary); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .flags-section { margin-bottom: 1rem; }
+    .flags-section label { display: block; font-size: .71rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; }
+    .flag-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .flag-pill {
+      padding: .3rem .75rem; border-radius: 999px; font-size: .78rem; font-weight: 700;
+      border: 2px solid transparent; cursor: pointer; transition: all .13s;
+    }
+    .flag-pill.inactive { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+    .flag-pill.active-isan       { background: #dcfce7; color: #15803d; border-color: #16a34a; }
+    .flag-pill.active-kk         { background: #dbeafe; color: #1d4ed8; border-color: #2563eb; }
+    .flag-pill.active-non_isan   { background: #fef3c7; color: #b45309; border-color: #d97706; }
+    .flag-pill.active-non_kk_isan{ background: #ede9fe; color: #6d28d9; border-color: #7c3aed; }
+    .drawer-save {
+      width: 100%; padding: .6rem; background: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: .9rem; font-weight: 700;
+      cursor: pointer; margin-top: .25rem; transition: background .15s;
+    }
+    .drawer-save:hover { background: var(--primary-h); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 1.25rem; left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: #1e293b; color: #fff;
+      padding: .5rem 1.1rem; border-radius: 8px;
+      font-size: .83rem; font-weight: 600;
+      transition: transform .22s; z-index: 2000; pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────── -->
+<header>
+  <div>
+    <h1>MD KKU — Student Editor</h1>
+    <div class="sub">คลิกเซลล์เพื่อแก้ไขโดยตรง • บันทึกอัตโนมัติ</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost" id="export-btn">⬇ Export CSV</button>
+  </div>
+</header>
+
+<!-- ── Filter / Stats ──────────────────────────── -->
+<div class="filter-bar">
+  <span class="chip all active" data-filter="all">ทั้งหมด <b id="cnt-all">…</b></span>
+  <div class="filter-sep"></div>
+  <span class="chip isan" data-filter="isan">อีสาน <b id="cnt-isan">…</b></span>
+  <span class="chip kk" data-filter="kk">ขอนแก่น <b id="cnt-kk">…</b></span>
+  <span class="chip non_isan" data-filter="non_isan">นอกอีสาน <b id="cnt-non-isan">…</b></span>
+  <span class="chip non_kk_isan" data-filter="non_kk_isan">อีสาน (ไม่ใช่ ขก) <b id="cnt-non-kk">…</b></span>
+</div>
+
+<!-- ── Toolbar ─────────────────────────────────── -->
+<div class="toolbar">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="search" id="search-input" placeholder="ค้นหา ชื่อ / โรงเรียน / จังหวัด / ประวัติ…" style="width:340px" />
+  </div>
+  <span class="spacer"></span>
+  <span class="save-status" id="save-status"></span>
+</div>
+
+<!-- ── Table ───────────────────────────────────── -->
+<div id="table-wrap">
+  <div id="student-table"></div>
+</div>
+
+<!-- ── Notes Drawer ────────────────────────────── -->
+<div id="drawer">
+  <div class="drawer-head">
+    <h2 id="drawer-title">ประวัติ / ผลงาน</h2>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <input type="hidden" id="d-row" />
+
+    <div class="flags-section">
+      <label>หมวดหมู่</label>
+      <div class="flag-pills">
+        <button class="flag-pill inactive" data-flag="is_isan">อีสาน</button>
+        <button class="flag-pill inactive" data-flag="is_kk">ขอนแก่น</button>
+        <button class="flag-pill inactive" data-flag="is_non_isan">นอกอีสาน</button>
+        <button class="flag-pill inactive" data-flag="is_non_kk_isan">อีสาน (ไม่ใช่ ขก)</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="dfield"><label>ชื่อเต็ม</label><input id="d-full_name" /></div>
+      <div class="dfield"><label>clean name</label><input id="d-clean_name" /></div>
+    </div>
+    <div class="grid2">
+      <div class="dfield"><label>โรงเรียน 1</label><input id="d-school_1" /></div>
+      <div class="dfield"><label>จังหวัด 1</label><input id="d-province_1" /></div>
+      <div class="dfield"><label>โรงเรียน 2</label><input id="d-school_2" /></div>
+      <div class="dfield"><label>จังหวัด 2</label><input id="d-province_2" /></div>
+      <div class="dfield"><label>โรงเรียน 3</label><input id="d-school_3" /></div>
+      <div class="dfield"><label>จังหวัด 3</label><input id="d-province_3" /></div>
+      <div class="dfield"><label>โรงเรียน 4</label><input id="d-school_4" /></div>
+      <div class="dfield"><label>จังหวัด 4</label><input id="d-province_4" /></div>
+      <div class="dfield"><label>โรงเรียน 5</label><input id="d-school_5" /></div>
+      <div class="dfield"><label>จังหวัด 5</label><input id="d-province_5" /></div>
+    </div>
+    <div class="dfield"><label>ประวัติโรงเรียน</label><textarea id="d-school_background" rows="5"></textarea></div>
+    <div class="dfield"><label>ผลงาน / Achievements</label><textarea id="d-achievements" rows="8"></textarea></div>
+
+    <button class="drawer-save" onclick="saveDrawer()">💾 บันทึก</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let currentFilter = "all";
+let currentSearch = "";
+let table;
+let saveTimer = null;
+let pendingSaves = {};   // rowId -> {field: value, ...}
+
+const FLAG_ACTIVE_CLASS = {
+  is_isan:        "active-isan",
+  is_kk:          "active-kk",
+  is_non_isan:    "active-non_isan",
+  is_non_kk_isan: "active-non_kk_isan",
+};
+
+// ── Save helpers ────────────────────────────────────────────────────
+function setSaveStatus(state, msg) {
+  const el = document.getElementById("save-status");
+  el.className = "save-status " + state;
+  el.textContent = msg;
+  if (state === "saved") {
+    clearTimeout(el._hide);
+    el._hide = setTimeout(() => { el.className = "save-status"; }, 2500);
+  }
+}
+
+function flushSave(rowId) {
+  const payload = pendingSaves[rowId];
+  if (!payload || Object.keys(payload).length === 0) return;
+  delete pendingSaves[rowId];
+
+  setSaveStatus("saving", "⏳ กำลังบันทึก…");
+
+  fetch(`/api/students/${rowId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.ok) {
+      setSaveStatus("saved", "✓ บันทึกแล้ว");
+      loadStats();
+      // clear dirty style
+      const row = table.getRow(rowId);
+      if (row) row.getElement().classList.remove("row-dirty");
+    } else {
+      setSaveStatus("error", "✗ บันทึกไม่สำเร็จ");
+    }
+  })
+  .catch(() => setSaveStatus("error", "✗ เชื่อมต่อล้มเหลว"));
+}
+
+function queueSave(rowId, field, value) {
+  if (!pendingSaves[rowId]) pendingSaves[rowId] = {};
+  pendingSaves[rowId][field] = value;
+
+  // mark row dirty
+  const row = table.getRow(rowId);
+  if (row) row.getElement().classList.add("row-dirty");
+
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    Object.keys(pendingSaves).forEach(id => flushSave(parseInt(id)));
+  }, 600);
+}
+
+// ── Flag cell formatter & click ─────────────────────────────────────
+function makeFlagFormatter(flagKey, cls) {
+  return function(cell) {
+    const on = !!cell.getValue();
+    const div = document.createElement("div");
+    div.className = "flag-cell" + (on ? ` on-${cls}` : "");
+    div.innerHTML = `<div class="tick">${on ? "✓" : ""}</div>`;
+    return div;
+  };
+}
+
+function flagCellClick(e, cell) {
+  const rowData = cell.getRow().getData();
+  const field = cell.getColumn().getField();
+  const newVal = rowData[field] ? 0 : 1;
+  cell.setValue(newVal);
+  queueSave(rowData.row, field, newVal);
+}
+
+// ── Notes button formatter ──────────────────────────────────────────
+function notesBtnFormatter(cell) {
+  const data = cell.getRow().getData();
+  const hasNotes = !!(data.school_background || data.achievements);
+  const btn = document.createElement("button");
+  btn.className = "notes-btn" + (hasNotes ? " has-notes" : "");
+  btn.textContent = hasNotes ? "📝" : "✎";
+  btn.title = "แก้ไข ประวัติ / ผลงาน";
+  return btn;
+}
+
+function notesBtnClick(e, cell) {
+  openDrawer(cell.getRow().getData());
+}
+
+// ── Table ────────────────────────────────────────────────────────────
+table = new Tabulator("#student-table", {
+  layout: "fitDataFill",
+  height: "calc(100vh - 148px)",
+  pagination: "local",
+  paginationSize: 50,
+  paginationSizeSelector: [25, 50, 100, 250],
+  placeholder: "ไม่พบข้อมูล",
+  index: "row",
+
+  columns: [
+    // ── Identity ────────────────────────────────
+    { title: "#",       field: "row",       width: 52, frozen: true, hozAlign: "center", headerHozAlign: "center" },
+    { title: "ชื่อเต็ม", field: "full_name", width: 200, frozen: true, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "full_name", c.getValue()) },
+    { title: "Clean",  field: "clean_name", width: 170, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "clean_name", c.getValue()) },
+
+    // ── Schools ─────────────────────────────────
+    { title: "โรงเรียน 1", field: "school_1",   minWidth: 200, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "school_1", c.getValue()) },
+    { title: "จังหวัด 1",  field: "province_1", width: 120, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "province_1", c.getValue()) },
+    { title: "โรงเรียน 2", field: "school_2",   minWidth: 190, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "school_2", c.getValue()) },
+    { title: "จังหวัด 2",  field: "province_2", width: 120, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "province_2", c.getValue()) },
+    { title: "โรงเรียน 3", field: "school_3",   minWidth: 190, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "school_3", c.getValue()) },
+    { title: "จังหวัด 3",  field: "province_3", width: 120, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "province_3", c.getValue()) },
+    { title: "โรงเรียน 4", field: "school_4",   minWidth: 190, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "school_4", c.getValue()) },
+    { title: "จังหวัด 4",  field: "province_4", width: 120, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "province_4", c.getValue()) },
+    { title: "โรงเรียน 5", field: "school_5",   minWidth: 190, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "school_5", c.getValue()) },
+    { title: "จังหวัด 5",  field: "province_5", width: 120, editor: "input",
+      cellEdited: c => queueSave(c.getRow().getData().row, "province_5", c.getValue()) },
+
+    // ── Flag checkboxes ─────────────────────────
+    { title: "อีสาน",      field: "is_isan",        width: 72,  hozAlign: "center", headerHozAlign: "center",
+      formatter: makeFlagFormatter("is_isan","isan"),          cellClick: flagCellClick },
+    { title: "ขก",         field: "is_kk",          width: 58,  hozAlign: "center", headerHozAlign: "center",
+      formatter: makeFlagFormatter("is_kk","kk"),              cellClick: flagCellClick },
+    { title: "นอกอีสาน",  field: "is_non_isan",    width: 88,  hozAlign: "center", headerHozAlign: "center",
+      formatter: makeFlagFormatter("is_non_isan","non_isan"),  cellClick: flagCellClick },
+    { title: "อีสาน¬ขก",  field: "is_non_kk_isan", width: 88,  hozAlign: "center", headerHozAlign: "center",
+      formatter: makeFlagFormatter("is_non_kk_isan","non_kk_isan"), cellClick: flagCellClick },
+
+    // ── Notes button ────────────────────────────
+    { title: "", field: "row", width: 46, hozAlign: "center", headerSort: false,
+      formatter: notesBtnFormatter, cellClick: notesBtnClick },
+  ],
+});
+
+// ── Load data ────────────────────────────────────────────────────────
+function loadData() {
+  const p = new URLSearchParams({ filter: currentFilter });
+  if (currentSearch) p.set("search", currentSearch);
+  fetch("/api/students?" + p)
+    .then(r => r.json())
+    .then(data => table.setData(data));
+}
+
+// ── Stats ────────────────────────────────────────────────────────────
+function loadStats() {
+  fetch("/api/stats").then(r => r.json()).then(s => {
+    document.getElementById("cnt-all").textContent = s.total;
+    document.getElementById("cnt-isan").textContent = s.isan;
+    document.getElementById("cnt-kk").textContent = s.kk;
+    document.getElementById("cnt-non-isan").textContent = s.non_isan;
+    document.getElementById("cnt-non-kk").textContent = s.non_kk_isan;
+  });
+}
+
+// ── Filter chips ─────────────────────────────────────────────────────
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    currentFilter = chip.dataset.filter;
+    loadData();
+  });
+});
+
+// ── Search ───────────────────────────────────────────────────────────
+let searchTimer2;
+document.getElementById("search-input").addEventListener("input", e => {
+  clearTimeout(searchTimer2);
+  searchTimer2 = setTimeout(() => {
+    currentSearch = e.target.value.trim();
+    loadData();
+  }, 280);
+});
+
+// ── Export ───────────────────────────────────────────────────────────
+document.getElementById("export-btn").addEventListener("click", () => {
+  table.download("csv", "students_export.csv");
+});
+
+// ── Drawer ───────────────────────────────────────────────────────────
+const FLAG_PILL_ACTIVE = {
+  is_isan:        "active-isan",
+  is_kk:          "active-kk",
+  is_non_isan:    "active-non_isan",
+  is_non_kk_isan: "active-non_kk_isan",
+};
+
+function openDrawer(data) {
+  document.getElementById("d-row").value = data.row;
+  document.getElementById("drawer-title").textContent =
+    data.clean_name || data.full_name || `#${data.row}`;
+
+  ["full_name","clean_name",
+   "school_1","province_1","school_2","province_2",
+   "school_3","province_3","school_4","province_4",
+   "school_5","province_5",
+   "school_background","achievements"].forEach(f => {
+    const el = document.getElementById("d-" + f);
+    if (el) el.value = data[f] || "";
+  });
+
+  document.querySelectorAll(".flag-pill").forEach(pill => {
+    const flag = pill.dataset.flag;
+    const on = !!data[flag];
+    pill.className = "flag-pill " + (on ? FLAG_PILL_ACTIVE[flag] : "inactive");
+  });
+
+  document.getElementById("drawer").classList.add("open");
+}
+
+function closeDrawer() {
+  document.getElementById("drawer").classList.remove("open");
+}
+
+document.querySelectorAll(".flag-pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    const flag = pill.dataset.flag;
+    const isInactive = pill.classList.contains("inactive");
+    pill.className = "flag-pill " + (isInactive ? FLAG_PILL_ACTIVE[flag] : "inactive");
+  });
+});
+
+function saveDrawer() {
+  const rowId = parseInt(document.getElementById("d-row").value);
+  const payload = {};
+
+  ["full_name","clean_name",
+   "school_1","province_1","school_2","province_2",
+   "school_3","province_3","school_4","province_4",
+   "school_5","province_5",
+   "school_background","achievements"].forEach(f => {
+    const el = document.getElementById("d-" + f);
+    if (el) payload[f] = el.value;
+  });
+
+  document.querySelectorAll(".flag-pill").forEach(pill => {
+    payload[pill.dataset.flag] = pill.classList.contains("inactive") ? 0 : 1;
+  });
+
+  setSaveStatus("saving", "⏳ กำลังบันทึก…");
+
+  fetch(`/api/students/${rowId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.ok) {
+      setSaveStatus("saved", "✓ บันทึกแล้ว");
+      showToast("บันทึกเรียบร้อย ✓");
+      loadData();
+      loadStats();
+      closeDrawer();
+    } else {
+      setSaveStatus("error", "✗ บันทึกไม่สำเร็จ");
+    }
+  })
+  .catch(() => setSaveStatus("error", "✗ เชื่อมต่อล้มเหลว"));
+}
+
+// close drawer on outside click
+document.addEventListener("mousedown", e => {
+  const drawer = document.getElementById("drawer");
+  if (drawer.classList.contains("open") && !drawer.contains(e.target)) {
+    closeDrawer();
+  }
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+loadData();
+loadStats();
+</script>
+</body>
+</html>

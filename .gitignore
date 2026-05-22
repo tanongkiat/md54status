@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# SQLite DB (rebuilt from CSVs on deploy)
+students.db
+
+# Sensitive / large files
+serper_results/
+*.doc
+*.docx
+*.xlsx
+*.xls
+summary_report.pdf
+
+# OS
+.DS_Store
+Thumbs.db
