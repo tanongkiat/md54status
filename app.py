@@ -4,12 +4,30 @@ Flask server for MD KKU Student Browser & Editor
 
 import sqlite3
 import os
-from flask import Flask, jsonify, request, render_template, abort
+import hmac
+from functools import wraps
+from flask import Flask, jsonify, request, render_template, abort, session, redirect, url_for
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "students.db")
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
+
+# Credentials – set LOGIN_USERNAME / LOGIN_PASSWORD env vars on Render
+LOGIN_USERNAME = os.environ.get("LOGIN_USERNAME", "admin")
+LOGIN_PASSWORD = os.environ.get("LOGIN_PASSWORD", "admin1234")
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "unauthorized"}), 401
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 
 EDITABLE_COLUMNS = [
@@ -35,12 +53,36 @@ def get_db():
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        # Use compare_digest to prevent timing attacks
+        ok_user = hmac.compare_digest(username, LOGIN_USERNAME)
+        ok_pass = hmac.compare_digest(password, LOGIN_PASSWORD)
+        if ok_user and ok_pass:
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        error = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
 
 @app.route("/api/students")
+@login_required
 def list_students():
     filter_tag = request.args.get("filter")  # all | isan | kk | non_isan | non_kk_isan
     search = request.args.get("search", "").strip()
@@ -78,6 +120,7 @@ def list_students():
 
 
 @app.route("/api/students/<int:row_id>", methods=["GET"])
+@login_required
 def get_student(row_id):
     conn = get_db()
     row = conn.execute("SELECT * FROM students WHERE row=?", (row_id,)).fetchone()
@@ -88,6 +131,7 @@ def get_student(row_id):
 
 
 @app.route("/api/students/<int:row_id>", methods=["PUT"])
+@login_required
 def update_student(row_id):
     data = request.get_json(force=True)
     if not data:
@@ -109,6 +153,7 @@ def update_student(row_id):
 
 
 @app.route("/api/students/<int:row_id>/toggle/<string:flag>", methods=["POST"])
+@login_required
 def toggle_flag(row_id, flag):
     if flag not in ("is_isan", "is_kk", "is_non_isan", "is_non_kk_isan"):
         abort(400)
@@ -126,6 +171,7 @@ def toggle_flag(row_id, flag):
 
 
 @app.route("/api/stats")
+@login_required
 def stats():
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
