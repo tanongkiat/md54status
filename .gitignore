@@ -15,8 +15,8 @@ build/
 env/
 venv/
 
-# SQLite DB (rebuilt from CSVs on deploy)
-students.db
+# SQLite DB – tracked in git
+# students.db
 
 # Sensitive / large files
 serper_results/
