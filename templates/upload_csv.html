@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>นำเข้า CSV – MD KKU</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f4f8; min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: #1e40af; color: #fff; padding: .75rem 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,.2); display: flex; align-items: center; gap: 1rem; }
+    header h1 { font-size: 1.1rem; font-weight: 700; }
+    header .sub { font-size: .78rem; opacity: .75; margin-top: .1rem; }
+    .header-right { margin-left: auto; display: flex; gap: .6rem; }
+    .btn { padding: .38rem .8rem; border-radius: 6px; border: none; font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-ghost { background: rgba(255,255,255,.15); color: #fff; }
+    .center { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.08); padding: 2.5rem 2rem; width: 100%; max-width: 440px; }
+    .card-title { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin-bottom: .3rem; }
+    .card-sub { font-size: .82rem; color: #64748b; margin-bottom: 1.75rem; }
+    label { display: block; font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: .4rem; }
+    input[type="file"] { width: 100%; padding: .5rem .75rem; border: 1.5px dashed #cbd5e1; border-radius: 7px; font-size: .85rem; background: #f8fafc; margin-bottom: 1.2rem; cursor: pointer; }
+    .btn-submit { width: 100%; padding: .65rem; background: #1e40af; color: #fff; border: none; border-radius: 7px; font-size: .95rem; font-weight: 700; cursor: pointer; }
+    .btn-submit:hover { background: #1d4ed8; }
+    .error-box { background: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 7px; padding: .55rem .8rem; font-size: .82rem; margin-bottom: 1.1rem; }
+    .success-box { background: #f0fdf4; border: 1px solid #86efac; color: #16a34a; border-radius: 7px; padding: .55rem .8rem; font-size: .82rem; margin-bottom: 1.1rem; }
+    .note { font-size: .78rem; color: #94a3b8; margin-top: 1rem; }
+    .links { margin-top: 1.2rem; display: flex; gap: .75rem; font-size: .82rem; }
+    .links a { color: #1e40af; text-decoration: none; }
+    .links a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MD KKU – Student Editor</h1>
+      <div class="sub">Admin – นำเข้าข้อมูล CSV</div>
+    </div>
+    <div class="header-right">
+      <a href="/" class="btn btn-ghost">← กลับหน้าหลัก</a>
+      <a href="/logout" class="btn btn-ghost">ออกจากระบบ</a>
+    </div>
+  </header>
+
+  <div class="center">
+    <div class="card">
+      <div class="card-title">นำเข้า students_export.csv</div>
+      <div class="card-sub">อัปโหลดไฟล์ CSV ที่ Export จากแอปเพื่อแทนที่ข้อมูลในฐานข้อมูล</div>
+
+      {% if error %}
+      <div class="error-box">{{ error }}</div>
+      {% endif %}
+      {% if success %}
+      <div class="success-box">✓ {{ success }}</div>
+      {% endif %}
+
+      <form method="POST" enctype="multipart/form-data">
+        <label for="csvfile">เลือกไฟล์ .csv</label>
+        <input type="file" id="csvfile" name="csvfile" accept=".csv" required />
+        <button type="submit" class="btn-submit">นำเข้าข้อมูล</button>
+      </form>
+
+      <div class="note">* ข้อมูลทั้งหมดในฐานข้อมูลจะถูกแทนที่ด้วยข้อมูลในไฟล์ CSV</div>
+
+      <div class="links">
+        <a href="/admin/download-db">⬇ ดาวน์โหลด students.db</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -195,6 +195,71 @@ def download_db():
     return send_file(DB_PATH, as_attachment=True, download_name="students.db")
 
 
+@app.route("/admin/upload-csv", methods=["GET", "POST"])
+@login_required
+def upload_csv():
+    """Upload a students_export.csv to rebuild the DB in place."""
+    if request.method == "GET":
+        return render_template("upload_csv.html")
+
+    file = request.files.get("csvfile")
+    if not file or not file.filename.endswith(".csv"):
+        return render_template("upload_csv.html", error="กรุณาเลือกไฟล์ .csv")
+
+    import csv as _csv
+    from import_csv_to_db import COL_MAP, FLAG_COLS
+
+    content = file.read().decode("utf-8-sig")
+    reader = _csv.DictReader(content.splitlines())
+    rows = list(reader)
+
+    if not rows:
+        return render_template("upload_csv.html", error="ไฟล์ว่างเปล่า")
+
+    conn = get_db()
+    cur = conn.cursor()
+    inserted = 0
+    for r in rows:
+        mapped = {}
+        for thai_col, db_col in COL_MAP.items():
+            val = r.get(thai_col, "")
+            if db_col in FLAG_COLS:
+                try:
+                    val = int(val) if str(val).strip() else 0
+                except ValueError:
+                    val = 0
+            mapped[db_col] = val
+
+        if not mapped.get("row"):
+            continue
+
+        cur.execute("""
+            INSERT OR REPLACE INTO students (
+                row, full_name, clean_name,
+                school_1, province_1, school_2, province_2,
+                school_3, province_3, school_4, province_4,
+                school_5, province_5,
+                school_background, achievements,
+                is_isan, is_kk, is_non_isan, is_non_kk_isan
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            int(mapped["row"]), mapped["full_name"], mapped["clean_name"],
+            mapped["school_1"], mapped["province_1"],
+            mapped["school_2"], mapped["province_2"],
+            mapped["school_3"], mapped["province_3"],
+            mapped["school_4"], mapped["province_4"],
+            mapped["school_5"], mapped["province_5"],
+            "", "",
+            mapped["is_isan"], mapped["is_kk"],
+            mapped["is_non_isan"], mapped["is_non_kk_isan"],
+        ))
+        inserted += 1
+
+    conn.commit()
+    conn.close()
+    return render_template("upload_csv.html", success=f"นำเข้าสำเร็จ {inserted} คน")
+
+
 if __name__ == "__main__":
     # Auto-init DB if not present
     if not os.path.exists(DB_PATH):
