@@ -84,20 +84,10 @@ def index():
 @app.route("/api/students")
 @login_required
 def list_students():
-    filter_tag = request.args.get("filter")  # all | isan | kk | non_isan | non_kk_isan
     search = request.args.get("search", "").strip()
 
     query = "SELECT * FROM students WHERE 1=1"
     params = []
-
-    filter_map = {
-        "isan": "is_isan",
-        "kk": "is_kk",
-        "non_isan": "is_non_isan",
-        "non_kk_isan": "is_non_kk_isan",
-    }
-    if filter_tag in filter_map:
-        query += f" AND {filter_map[filter_tag]}=1"
 
     if search:
         query += """ AND (
@@ -258,6 +248,122 @@ def upload_csv():
     conn.commit()
     conn.close()
     return render_template("upload_csv.html", success=f"นำเข้าสำเร็จ {inserted} คน")
+
+
+# ── Province → Region mapping ────────────────────────────────────────────────
+
+PROVINCE_REGION = {
+    # อีสาน
+    "กาฬสินธุ์": "อีสาน", "ขอนแก่น": "อีสาน", "ชัยภูมิ": "อีสาน",
+    "นครพนม": "อีสาน", "นครราชสีมา": "อีสาน", "บึงกาฬ": "อีสาน",
+    "บุรีรัมย์": "อีสาน", "มหาสารคาม": "อีสาน", "มุกดาหาร": "อีสาน",
+    "ยโสธร": "อีสาน", "ร้อยเอ็ด": "อีสาน", "เลย": "อีสาน",
+    "ศรีสะเกษ": "อีสาน", "สกลนคร": "อีสาน", "สุรินทร์": "อีสาน",
+    "หนองคาย": "อีสาน", "หนองบัวลำภู": "อีสาน", "อำนาจเจริญ": "อีสาน",
+    "อุดรธานี": "อีสาน", "อุบลราชธานี": "อีสาน",
+    # เหนือ
+    "กำแพงเพชร": "เหนือ", "เชียงราย": "เหนือ", "เชียงใหม่": "เหนือ",
+    "ตาก": "เหนือ", "น่าน": "เหนือ", "พะเยา": "เหนือ",
+    "พิจิตร": "เหนือ", "พิษณุโลก": "เหนือ", "เพชรบูรณ์": "เหนือ",
+    "แพร่": "เหนือ", "แม่ฮ่องสอน": "เหนือ", "ลำปาง": "เหนือ",
+    "ลำพูน": "เหนือ", "สุโขทัย": "เหนือ", "อุตรดิตถ์": "เหนือ",
+    "อุทัยธานี": "เหนือ", "นครสวรรค์": "เหนือ",
+    # กลาง
+    "กรุงเทพมหานคร": "กลาง", "กาญจนบุรี": "กลาง", "นครนายก": "กลาง",
+    "นครปฐม": "กลาง", "นนทบุรี": "กลาง", "ปทุมธานี": "กลาง",
+    "พระนครศรีอยุธยา": "กลาง", "ราชบุรี": "กลาง", "ลพบุรี": "กลาง",
+    "สมุทรปราการ": "กลาง", "สมุทรสงคราม": "กลาง", "สมุทรสาคร": "กลาง",
+    "สระบุรี": "กลาง", "สิงห์บุรี": "กลาง", "สุพรรณบุรี": "กลาง",
+    "อ่างทอง": "กลาง", "ชัยนาท": "กลาง",
+    # ตะวันออก
+    "จันทบุรี": "ตะวันออก", "ฉะเชิงเทรา": "ตะวันออก", "ชลบุรี": "ตะวันออก",
+    "ตราด": "ตะวันออก", "ปราจีนบุรี": "ตะวันออก", "ระยอง": "ตะวันออก",
+    "สระแก้ว": "ตะวันออก",
+    # ตะวันตก
+    "ประจวบคีรีขันธ์": "ตะวันตก", "เพชรบุรี": "ตะวันตก",
+    # ใต้
+    "กระบี่": "ใต้", "ชุมพร": "ใต้", "ตรัง": "ใต้",
+    "นครศรีธรรมราช": "ใต้", "นราธิวาส": "ใต้", "ปัตตานี": "ใต้",
+    "พังงา": "ใต้", "พัทลุง": "ใต้", "ภูเก็ต": "ใต้",
+    "ยะลา": "ใต้", "ระนอง": "ใต้", "สงขลา": "ใต้",
+    "สตูล": "ใต้", "สุราษฎร์ธานี": "ใต้",
+}
+
+REGION_ORDER = ["อีสาน", "กลาง", "เหนือ", "ตะวันออก", "ตะวันตก", "ใต้", "ต่างประเทศ/อื่นๆ"]
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return render_template("dashboard.html")
+
+
+@app.route("/api/dashboard")
+@login_required
+def api_dashboard():
+    conn = get_db()
+
+    # ── Region flags (from student-level flags) ──────────────────────────
+    def cnt(col):
+        return conn.execute(f"SELECT COUNT(*) FROM students WHERE {col}=1").fetchone()[0]
+
+    total = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+    flag_stats = {
+        "ทั้งหมด": total,
+        "อีสาน": cnt("is_isan"),
+        "ขอนแก่น": cnt("is_kk"),
+        "อีสาน (ไม่ใช่ ขก)": cnt("is_non_kk_isan"),
+        "นอกอีสาน": cnt("is_non_isan"),
+    }
+
+    # ── Province counts (all 5 slots, primary school province only = slot 1) ─
+    prov_rows = conn.execute("""
+        SELECT province, COUNT(*) as cnt FROM (
+            SELECT province_1 as province FROM students WHERE province_1 != '' AND province_1 IS NOT NULL
+            UNION ALL SELECT province_2 FROM students WHERE province_2 != '' AND province_2 IS NOT NULL
+            UNION ALL SELECT province_3 FROM students WHERE province_3 != '' AND province_3 IS NOT NULL
+            UNION ALL SELECT province_4 FROM students WHERE province_4 != '' AND province_4 IS NOT NULL
+            UNION ALL SELECT province_5 FROM students WHERE province_5 != '' AND province_5 IS NOT NULL
+        ) GROUP BY province ORDER BY cnt DESC LIMIT 30
+    """).fetchall()
+    province_stats = [{"province": r[0], "count": r[1]} for r in prov_rows]
+
+    # Province slot-1 only (primary school)
+    prov1_rows = conn.execute("""
+        SELECT province_1 as province, COUNT(*) as cnt FROM students
+        WHERE province_1 != '' AND province_1 IS NOT NULL
+        GROUP BY province_1 ORDER BY cnt DESC LIMIT 30
+    """).fetchall()
+    province1_stats = [{"province": r[0], "count": r[1]} for r in prov1_rows]
+
+    # ── School counts ────────────────────────────────────────────────────
+    school_rows = conn.execute("""
+        SELECT school, COUNT(*) as cnt FROM (
+            SELECT school_1 as school FROM students WHERE school_1 != '' AND school_1 IS NOT NULL
+            UNION ALL SELECT school_2 FROM students WHERE school_2 != '' AND school_2 IS NOT NULL
+            UNION ALL SELECT school_3 FROM students WHERE school_3 != '' AND school_3 IS NOT NULL
+            UNION ALL SELECT school_4 FROM students WHERE school_4 != '' AND school_4 IS NOT NULL
+            UNION ALL SELECT school_5 FROM students WHERE school_5 != '' AND school_5 IS NOT NULL
+        ) GROUP BY school ORDER BY cnt DESC LIMIT 30
+    """).fetchall()
+    school_stats = [{"school": r[0], "count": r[1]} for r in school_rows]
+
+    # ── Region aggregation from province data ────────────────────────────
+    region_counts = {r: 0 for r in REGION_ORDER}
+    for p in province_stats:
+        region = PROVINCE_REGION.get(p["province"], "ต่างประเทศ/อื่นๆ")
+        region_counts[region] = region_counts.get(region, 0) + p["count"]
+    region_stats = [{"region": k, "count": v} for k, v in region_counts.items() if v > 0]
+
+    conn.close()
+    return jsonify({
+        "flag_stats": flag_stats,
+        "province_stats": province_stats,
+        "province1_stats": province1_stats,
+        "school_stats": school_stats,
+        "region_stats": region_stats,
+        "total": total,
+    })
 
 
 if __name__ == "__main__":
