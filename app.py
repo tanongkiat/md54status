@@ -103,12 +103,7 @@ def list_students():
     if search:
         query += """ AND (
             full_name LIKE ? OR clean_name LIKE ?
-            OR school_1 LIKE ? OR province_1 LIKE ?
-            OR school_2 LIKE ? OR province_2 LIKE ?
-            OR school_3 LIKE ? OR province_3 LIKE ?
-            OR school_4 LIKE ? OR province_4 LIKE ?
-            OR school_5 LIKE ? OR province_5 LIKE ?
-            OR school_background LIKE ? OR achievements LIKE ?
+            OR school_1 LIKE ? OR province_1 LIKE ?         
         )"""
         params += [f"%{search}%"] * 14
 
@@ -340,19 +335,7 @@ def api_dashboard():
         "นอกอีสาน": cnt("is_non_isan"),
     }
 
-    # ── Province counts (all 5 slots, primary school province only = slot 1) ─
-    prov_rows = conn.execute("""
-        SELECT province, COUNT(*) as cnt FROM (
-            SELECT province_1 as province FROM students WHERE province_1 != '' AND province_1 IS NOT NULL
-            UNION ALL SELECT province_2 FROM students WHERE province_2 != '' AND province_2 IS NOT NULL
-            UNION ALL SELECT province_3 FROM students WHERE province_3 != '' AND province_3 IS NOT NULL
-            UNION ALL SELECT province_4 FROM students WHERE province_4 != '' AND province_4 IS NOT NULL
-            UNION ALL SELECT province_5 FROM students WHERE province_5 != '' AND province_5 IS NOT NULL
-        ) GROUP BY province ORDER BY cnt DESC LIMIT 30
-    """).fetchall()
-    province_stats = [{"province": r[0], "count": r[1]} for r in prov_rows]
-
-    # Province slot-1 only (primary school)
+    # ── Province counts (slot 1 only) ───────────────────────────────────
     prov1_rows = conn.execute("""
         SELECT province_1 as province, COUNT(*) as cnt FROM students
         WHERE province_1 != '' AND province_1 IS NOT NULL
@@ -360,21 +343,17 @@ def api_dashboard():
     """).fetchall()
     province1_stats = [{"province": r[0], "count": r[1]} for r in prov1_rows]
 
-    # ── School counts ────────────────────────────────────────────────────
+    # ── School counts (slot 1 only) ──────────────────────────────────────
     school_rows = conn.execute("""
-        SELECT school, COUNT(*) as cnt FROM (
-            SELECT school_1 as school FROM students WHERE school_1 != '' AND school_1 IS NOT NULL
-            UNION ALL SELECT school_2 FROM students WHERE school_2 != '' AND school_2 IS NOT NULL
-            UNION ALL SELECT school_3 FROM students WHERE school_3 != '' AND school_3 IS NOT NULL
-            UNION ALL SELECT school_4 FROM students WHERE school_4 != '' AND school_4 IS NOT NULL
-            UNION ALL SELECT school_5 FROM students WHERE school_5 != '' AND school_5 IS NOT NULL
-        ) GROUP BY school ORDER BY cnt DESC LIMIT 30
+        SELECT school_1 as school, COUNT(*) as cnt FROM students
+        WHERE school_1 != '' AND school_1 IS NOT NULL
+        GROUP BY school_1 ORDER BY cnt DESC LIMIT 30
     """).fetchall()
     school_stats = [{"school": r[0], "count": r[1]} for r in school_rows]
 
-    # ── Region aggregation from province data ────────────────────────────
+    # ── Region aggregation from province_1 data ──────────────────────────
     region_counts = {r: 0 for r in REGION_ORDER}
-    for p in province_stats:
+    for p in province1_stats:
         region = PROVINCE_REGION.get(p["province"], "ต่างประเทศ/อื่นๆ")
         region_counts[region] = region_counts.get(region, 0) + p["count"]
     region_stats = [{"region": k, "count": v} for k, v in region_counts.items() if v > 0]
@@ -382,7 +361,6 @@ def api_dashboard():
     conn.close()
     return jsonify({
         "flag_stats": flag_stats,
-        "province_stats": province_stats,
         "province1_stats": province1_stats,
         "school_stats": school_stats,
         "region_stats": region_stats,

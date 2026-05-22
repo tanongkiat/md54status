@@ -120,11 +120,11 @@
   <!-- ── Charts row 2 ── -->
   <div class="chart-grid">
 
-    <!-- Province table -->
+    <!-- Province table (slot 1 only) -->
     <div class="chart-card">
       <div>
-        <div class="chart-title">Top จังหวัด (โรงเรียน 1)</div>
-        <div class="chart-sub">นับจาก province_1 เท่านั้น</div>
+        <div class="chart-title">Top จังหวัด</div>
+        <div class="chart-sub">นับจากโรงเรียน 1 / จังหวัด 1 เท่านั้น</div>
       </div>
       <div style="overflow-y:auto; max-height: 420px;">
         <table class="rank-table">
@@ -134,27 +134,13 @@
       </div>
     </div>
 
-    <!-- Province all slots table -->
-    <div class="chart-card">
-      <div>
-        <div class="chart-title">Top จังหวัด (ทุก slot)</div>
-        <div class="chart-sub">รวม province_1–5</div>
-      </div>
-      <div style="overflow-y:auto; max-height: 420px;">
-        <table class="rank-table">
-          <thead><tr><th>#</th><th>จังหวัด</th><th>นักศึกษา</th><th class="bar-cell"></th><th class="pct-cell">%</th></tr></thead>
-          <tbody id="tbl-province-all"></tbody>
-        </table>
-      </div>
-    </div>
-
   </div>
 
   <!-- ── School table full width ── -->
   <div class="chart-card full-width">
     <div>
-      <div class="chart-title">Top โรงเรียน (ทุก slot)</div>
-      <div class="chart-sub">รวม school_1–5 • คลิกหัวข้อเพื่อเรียงลำดับ</div>
+      <div class="chart-title">Top โรงเรียน</div>
+      <div class="chart-sub">นับจากโรงเรียน 1 เท่านั้น</div>
     </div>
     <div style="overflow-x:auto;">
       <table class="rank-table">
@@ -260,7 +246,7 @@ fetch("/api/dashboard")
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => ` ${ctx.raw} คน (${pct(ctx.raw, d.province_stats.reduce((a,b)=>a+b.count,0))})`
+              label: ctx => ` ${ctx.raw} คน (${pct(ctx.raw, d.region_stats.reduce((a,b)=>a+b.count,0))})`
             }
           }
         },
@@ -272,9 +258,8 @@ fetch("/api/dashboard")
     });
 
     // ── Tables ──
-    buildTable("tbl-province1",    d.province1_stats, total, "#1e40af");
-    buildTable("tbl-province-all", d.province_stats,  d.province_stats.reduce((a,b)=>a+b.count,0), "#0891b2");
-    buildTable("tbl-school",       d.school_stats,    d.school_stats.reduce((a,b)=>a+b.count,0), "#7c3aed");
+    buildTable("tbl-province1", d.province1_stats, total, "#1e40af");
+    buildTable("tbl-school",    d.school_stats,    total, "#7c3aed");
   });
 </script>
 </body>
