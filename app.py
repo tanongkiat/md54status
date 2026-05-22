@@ -6,7 +6,7 @@ import sqlite3
 import os
 import hmac
 from functools import wraps
-from flask import Flask, jsonify, request, render_template, abort, session, redirect, url_for
+from flask import Flask, jsonify, request, render_template, abort, session, redirect, url_for, send_file
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "students.db")
@@ -184,6 +184,15 @@ def stats():
         "total": total, "isan": isan, "kk": kk,
         "non_isan": non_isan, "non_kk_isan": non_kk_isan,
     })
+
+
+@app.route("/admin/download-db")
+@login_required
+def download_db():
+    """Download the live students.db (login required)."""
+    if not os.path.exists(DB_PATH):
+        abort(404)
+    return send_file(DB_PATH, as_attachment=True, download_name="students.db")
 
 
 if __name__ == "__main__":
