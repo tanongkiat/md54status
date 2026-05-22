@@ -103,9 +103,10 @@ def list_students():
     if search:
         query += """ AND (
             full_name LIKE ? OR clean_name LIKE ?
-            OR school_1 LIKE ? OR province_1 LIKE ?         
+            OR school_1 LIKE ? OR province_1 LIKE ?
+            OR school_background LIKE ? OR achievements LIKE ?
         )"""
-        params += [f"%{search}%"] * 14
+        params += [f"%{search}%"] * 6
 
     query += " ORDER BY row"
 
