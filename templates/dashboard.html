@@ -239,7 +239,7 @@ function loadDashboardData() {
     document.getElementById("s-total").textContent = total;
     document.getElementById("s-isan").textContent  = fs["อีสาน"];
     document.getElementById("s-noisan").textContent= fs["นอกอีสาน"];
-    document.getElementById("s-bkk").textContent   = d.province_stats.filter(p => ["กรุงเทพมหานคร","นนทบุรี","ปทุมธานี","สมุทรปราการ","นครปฐม","สมุทรสาคร"].includes(p.province)).reduce((a,b)=>a+b.count,0);
+    document.getElementById("s-bkk").textContent   = fs["กรุงเทพ+ปริมณฑล"];
     document.getElementById("s-kk").textContent    = fs["ขอนแก่น"];
     document.getElementById("s-nokk").textContent  = fs["อีสาน (ไม่ใช่ ขก)"];
 

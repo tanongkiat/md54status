@@ -103,10 +103,9 @@ def list_students():
     if search:
         query += """ AND (
             full_name LIKE ? OR clean_name LIKE ?
-            OR school_1 LIKE ? OR province_1 LIKE ?
-            OR school_background LIKE ? OR achievements LIKE ?
+            OR school_1 LIKE ? OR province_1 LIKE ?          
         )"""
-        params += [f"%{search}%"] * 6
+        params += [f"%{search}%"] * 4
 
     query += " ORDER BY row"
 
@@ -370,6 +369,7 @@ def api_dashboard():
     flag_stats = {
         "ทั้งหมด": total,
         "อีสาน": cnt("is_isan"),
+        "กรุงเทพ+ปริมณฑล": cnt("is_bkk"),
         "ขอนแก่น": cnt("is_kk"),
         "อีสาน (ไม่ใช่ ขก)": cnt("is_non_kk_isan"),
         "นอกอีสาน": cnt("is_non_isan"),
