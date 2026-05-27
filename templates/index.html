@@ -246,6 +246,7 @@
     <span class="search-icon">🔍</span>
     <input type="search" id="search-input" placeholder="ค้นหา ชื่อ / โรงเรียน / จังหวัด / ประวัติ…" style="width:340px" />
   </div>
+  <button class="tb-btn" id="refresh-db-btn">↻ อัปเดตจาก DB</button>
   <span class="spacer"></span>
   <span class="save-status" id="save-status"></span>
 </div>
@@ -345,6 +346,7 @@ function flushSave(rowId) {
       // clear dirty style
       const row = table.getRow(rowId);
       if (row) row.getElement().classList.remove("row-dirty");
+      loadStats();
     } else {
       setSaveStatus("error", "✗ บันทึกไม่สำเร็จ");
     }
@@ -444,20 +446,38 @@ table = new Tabulator("#student-table", {
 function loadData() {
   const p = new URLSearchParams({ filter: currentFilter });
   if (currentSearch) p.set("search", currentSearch);
-  fetch("/api/students?" + p)
+  return fetch("/api/students?" + p)
     .then(r => r.json())
     .then(data => table.setData(data));
 }
 
 // ── Stats ──────────────────────────────────────────────────────────
 function loadStats() {
-  fetch("/api/stats").then(r => r.json()).then(s => {
+  return fetch("/api/stats").then(r => r.json()).then(s => {
     document.getElementById("cnt-all").textContent         = s.total;
     document.getElementById("cnt-isan").textContent        = s.isan;
     document.getElementById("cnt-non-isan").textContent    = s.non_isan;
     document.getElementById("cnt-bkk").textContent         = s.bkk;
     document.getElementById("cnt-kk").textContent          = s.kk;
     document.getElementById("cnt-non-kk-isan").textContent = s.non_kk_isan;
+  });
+}
+
+function refreshFromDb() {
+  const btn = document.getElementById("refresh-db-btn");
+  btn.disabled = true;
+  btn.textContent = "↻ กำลังอัปเดต...";
+
+  Promise.all([loadData(), loadStats()])
+  .then(() => {
+    showToast("อัปเดตข้อมูลล่าสุดจากฐานข้อมูลแล้ว");
+  })
+  .catch(() => {
+    showToast("อัปเดตไม่สำเร็จ กรุณาลองใหม่");
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = "↻ อัปเดตจาก DB";
   });
 }
 
@@ -485,6 +505,8 @@ document.getElementById("search-input").addEventListener("input", e => {
 document.getElementById("export-btn").addEventListener("click", () => {
   table.download("csv", "students_export.csv");
 });
+
+document.getElementById("refresh-db-btn").addEventListener("click", refreshFromDb);
 
 // ── Drawer ───────────────────────────────────────────────────────────
 const FLAG_PILL_ACTIVE = {

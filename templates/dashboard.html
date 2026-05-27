@@ -82,6 +82,7 @@
     <div class="sub">สถิตินักศึกษาแพทย์ มข. รุ่น 54 จำแนกตามจังหวัดและโรงเรียน</div>
   </div>
   <div class="header-right">
+    <button class="btn btn-ghost" id="refresh-dashboard-btn">↻ อัปเดตจาก DB</button>
     <a href="/" class="btn btn-ghost">← ตารางข้อมูล</a>
     <a href="/logout" class="btn btn-ghost">ออกจากระบบ</a>
   </div>
@@ -131,7 +132,7 @@
     <div class="chart-card">
       <div>
         <div class="chart-title">Top จังหวัด</div>
-        <div class="chart-sub">นับจากโรงเรียน 1 / จังหวัด 1 เท่านั้น</div>
+        <div class="chart-sub">นับจากทุกช่องจังหวัดที่บันทึกไว้ในฐานข้อมูล</div>
       </div>
       <div style="overflow-y:auto; max-height: 420px;">
         <table class="rank-table">
@@ -189,6 +190,11 @@ const PALETTE = [
   "#1d4ed8","#15803d","#b45309","#9f1239","#1e3a8a","#581c87",
 ];
 
+let donutChart = null;
+let regionChart = null;
+let genderDonutChart = null;
+let genderRegionChart = null;
+
 function pct(val, total) {
   return total ? ((val / total) * 100).toFixed(1) + "%" : "0%";
 }
@@ -212,7 +218,18 @@ function buildTable(tbodyId, rows, total, barColor) {
   });
 }
 
-fetch("/api/dashboard")
+function updateRefreshButton(isLoading) {
+  const btn = document.getElementById("refresh-dashboard-btn");
+  if (!btn) return;
+  btn.disabled = isLoading;
+  btn.style.opacity = isLoading ? "0.65" : "1";
+  btn.textContent = isLoading ? "↻ กำลังอัปเดต..." : "↻ อัปเดตจาก DB";
+}
+
+function loadDashboardData() {
+  updateRefreshButton(true);
+
+  fetch("/api/dashboard")
   .then(r => r.json())
   .then(d => {
     const total = d.total;
@@ -222,7 +239,7 @@ fetch("/api/dashboard")
     document.getElementById("s-total").textContent = total;
     document.getElementById("s-isan").textContent  = fs["อีสาน"];
     document.getElementById("s-noisan").textContent= fs["นอกอีสาน"];
-    document.getElementById("s-bkk").textContent   = d.province1_stats.filter(p => ["กรุงเทพมหานคร","นนทบุรี","ปทุมธานี","สมุทรปราการ","นครปฐม","สมุทรสาคร"].includes(p.province)).reduce((a,b)=>a+b.count,0);
+    document.getElementById("s-bkk").textContent   = d.province_stats.filter(p => ["กรุงเทพมหานคร","นนทบุรี","ปทุมธานี","สมุทรปราการ","นครปฐม","สมุทรสาคร"].includes(p.province)).reduce((a,b)=>a+b.count,0);
     document.getElementById("s-kk").textContent    = fs["ขอนแก่น"];
     document.getElementById("s-nokk").textContent  = fs["อีสาน (ไม่ใช่ ขก)"];
 
@@ -234,7 +251,8 @@ fetch("/api/dashboard")
     setPct("p-nokk", fs["อีสาน (ไม่ใช่ ขก)"]);
 
     // ── Donut chart ──
-    new Chart(document.getElementById("chart-donut"), {
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(document.getElementById("chart-donut"), {
       type: "doughnut",
       data: {
         labels: ["อีสาน", "ขอนแก่น", "อีสาน≠ขก", "นอกอีสาน"],
@@ -259,7 +277,8 @@ fetch("/api/dashboard")
 
     // ── Region bar chart ──
     const regions = d.region_stats;
-    new Chart(document.getElementById("chart-region"), {
+    if (regionChart) regionChart.destroy();
+    regionChart = new Chart(document.getElementById("chart-region"), {
       type: "bar",
       data: {
         labels: regions.map(r => r.region),
@@ -288,7 +307,7 @@ fetch("/api/dashboard")
     });
 
     // ── Tables ──
-    buildTable("tbl-province1", d.province1_stats, total, "#1e40af");
+    buildTable("tbl-province1", d.province_stats, total, "#1e40af");
     buildTable("tbl-school",    d.school_stats,    total, "#7c3aed");
 
     // ── Gender stat cards ──
@@ -299,7 +318,8 @@ fetch("/api/dashboard")
     setPct("p-female", g.female);
 
     // ── Gender donut ──
-    new Chart(document.getElementById("chart-gender-donut"), {
+    if (genderDonutChart) genderDonutChart.destroy();
+    genderDonutChart = new Chart(document.getElementById("chart-gender-donut"), {
       type: "doughnut",
       data: {
         labels: ["ชาย", "หญิง"],
@@ -316,7 +336,8 @@ fetch("/api/dashboard")
 
     // ── Gender by region stacked bar ──
     const gr = d.gender_region_stats;
-    new Chart(document.getElementById("chart-gender-region"), {
+    if (genderRegionChart) genderRegionChart.destroy();
+    genderRegionChart = new Chart(document.getElementById("chart-gender-region"), {
       type: "bar",
       data: {
         labels: gr.map(r => r.region),
@@ -348,7 +369,17 @@ fetch("/api/dashboard")
         <td class="pct-cell">${mp}</td>
       </tr>`;
     });
+  })
+  .catch(() => {
+    alert("อัปเดตข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+  })
+  .finally(() => {
+    updateRefreshButton(false);
   });
+}
+
+document.getElementById("refresh-dashboard-btn").addEventListener("click", loadDashboardData);
+loadDashboardData();
 </script>
 </body>
 </html>

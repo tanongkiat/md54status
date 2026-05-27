@@ -144,6 +144,34 @@ def update_student(row_id):
 
     conn = get_db()
     conn.execute(f"UPDATE students SET {set_clause} WHERE row=?", values)
+
+    # Keep derived flags consistent when primary province is edited in UI.
+    if "province_1" in updates:
+        p = str(updates.get("province_1", "") or "").strip()
+        is_isan_provinces = {
+            "กาฬสินธุ์", "ขอนแก่น", "ชัยภูมิ", "นครพนม", "นครราชสีมา",
+            "บึงกาฬ", "บุรีรัมย์", "มหาสารคาม", "มุกดาหาร", "ยโสธร",
+            "ร้อยเอ็ด", "เลย", "ศรีสะเกษ", "สกลนคร", "สุรินทร์",
+            "หนองคาย", "หนองบัวลำภู", "อำนาจเจริญ", "อุดรธานี", "อุบลราชธานี",
+        }
+        bkk_provinces = {
+            "กรุงเทพมหานคร", "นนทบุรี", "ปทุมธานี",
+            "สมุทรปราการ", "นครปฐม", "สมุทรสาคร",
+        }
+        is_isan = 1 if p in is_isan_provinces else 0
+        is_kk = 1 if p == "ขอนแก่น" else 0
+        is_non_isan = 1 if p and p not in is_isan_provinces else 0
+        is_non_kk_isan = 1 if p in is_isan_provinces and p != "ขอนแก่น" else 0
+        is_bkk = 1 if p in bkk_provinces else 0
+        conn.execute(
+            """
+            UPDATE students
+            SET is_isan=?, is_kk=?, is_non_isan=?, is_non_kk_isan=?, is_bkk=?
+            WHERE row=?
+            """,
+            (is_isan, is_kk, is_non_isan, is_non_kk_isan, is_bkk, row_id),
+        )
+
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -312,6 +340,17 @@ PROVINCE_REGION = {
 REGION_ORDER = ["อีสาน", "กลาง", "เหนือ", "ตะวันออก", "ตะวันตก", "ใต้", "ต่างประเทศ/อื่นๆ"]
 
 
+def all_province_union_sql(alias: str = "province") -> str:
+    parts = [
+        f"SELECT row, province_1 AS {alias}, 1 AS slot FROM students",
+        f"SELECT row, province_2 AS {alias}, 2 AS slot FROM students",
+        f"SELECT row, province_3 AS {alias}, 3 AS slot FROM students",
+        f"SELECT row, province_4 AS {alias}, 4 AS slot FROM students",
+        f"SELECT row, province_5 AS {alias}, 5 AS slot FROM students",
+    ]
+    return " UNION ALL ".join(parts)
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -336,13 +375,17 @@ def api_dashboard():
         "นอกอีสาน": cnt("is_non_isan"),
     }
 
-    # ── Province counts (slot 1 only) ───────────────────────────────────
-    prov1_rows = conn.execute("""
-        SELECT province_1 as province, COUNT(*) as cnt FROM students
-        WHERE province_1 != '' AND province_1 IS NOT NULL
-        GROUP BY province_1 ORDER BY cnt DESC LIMIT 30
+    # ── Province aggregation across all school slots ─────────────────────
+    province_rows = conn.execute(f"""
+        SELECT province, COUNT(*) AS cnt
+        FROM (
+            {all_province_union_sql('province')}
+        )
+        WHERE province != '' AND province IS NOT NULL
+        GROUP BY province
+        ORDER BY cnt DESC
     """).fetchall()
-    province1_stats = [{"province": r[0], "count": r[1]} for r in prov1_rows]
+    province_stats = [{"province": r[0], "count": r[1]} for r in province_rows]
 
     # ── School counts (slot 1 only) ──────────────────────────────────────
     school_rows = conn.execute("""
@@ -352,9 +395,9 @@ def api_dashboard():
     """).fetchall()
     school_stats = [{"school": r[0], "count": r[1]} for r in school_rows]
 
-    # ── Region aggregation from province_1 data ──────────────────────────
+    # ── Region aggregation from all province slots ───────────────────────
     region_counts = {r: 0 for r in REGION_ORDER}
-    for p in province1_stats:
+    for p in province_stats:
         region = PROVINCE_REGION.get(p["province"], "ต่างประเทศ/อื่นๆ")
         region_counts[region] = region_counts.get(region, 0) + p["count"]
     region_stats = [{"region": k, "count": v} for k, v in region_counts.items() if v > 0]
@@ -364,13 +407,23 @@ def api_dashboard():
     female_total = total - male_total
 
     gender_province_rows = conn.execute("""
-        SELECT province_1,
+        SELECT province,
             SUM(CASE WHEN full_name LIKE 'นาย%' THEN 1 ELSE 0 END) as male,
             SUM(CASE WHEN full_name NOT LIKE 'นาย%' THEN 1 ELSE 0 END) as female,
             COUNT(*) as cnt
-        FROM students
-        WHERE province_1 != '' AND province_1 IS NOT NULL
-        GROUP BY province_1 ORDER BY cnt DESC LIMIT 30
+        FROM (
+            SELECT s.row, s.full_name, s.province_1 AS province FROM students s
+            UNION ALL
+            SELECT s.row, s.full_name, s.province_2 AS province FROM students s
+            UNION ALL
+            SELECT s.row, s.full_name, s.province_3 AS province FROM students s
+            UNION ALL
+            SELECT s.row, s.full_name, s.province_4 AS province FROM students s
+            UNION ALL
+            SELECT s.row, s.full_name, s.province_5 AS province FROM students s
+        )
+        WHERE province != '' AND province IS NOT NULL
+        GROUP BY province ORDER BY cnt DESC LIMIT 30
     """).fetchall()
     gender_province_stats = [{"province": r[0], "male": r[1], "female": r[2], "total": r[3]} for r in gender_province_rows]
 
@@ -387,7 +440,7 @@ def api_dashboard():
     conn.close()
     return jsonify({
         "flag_stats": flag_stats,
-        "province1_stats": province1_stats,
+        "province_stats": province_stats,
         "school_stats": school_stats,
         "region_stats": region_stats,
         "gender_total": {"male": male_total, "female": female_total},
